@@ -1,0 +1,67 @@
+name: shpinx doc generation
+#
+# For this to work, you need to go to your github repository settings.
+#
+# - Left pane, navigate to "Pages"
+# - Enable GitHub Pages
+# - Build and deployment : Source : GitHub Actions
+# - Push this workflow to github and watch it run...
+#
+
+on:
+  # Runs on pushes targeting the default branch
+  # Temporarily disabled
+  push:
+    branches: ["main"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between
+# the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these
+# production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  sphinx_docs_to_gh-pages:
+    runs-on: ubuntu-latest
+    name: sphinx docs to gh-pages
+    steps:
+      - uses: actions/checkout@v3
+        with:
+         fetch-depth: 0
+      - name: Setup Pages
+        # I am not sure what is this step for... Maybe for the upload-pages to work?
+        uses: actions/configure-pages@v3
+      - name: Generating sphinx documentation
+        run: |
+          make -C docs html && cp -av docs/_build/html _site
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+  # Deployment job
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: sphinx_docs_to_gh-pages
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+
+
+
+
+
+
