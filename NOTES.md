@@ -33,3 +33,9 @@ Source preferences
 * [OTC extenstions configuration](https://python-otcextensions.readthedocs.io/en/latest/install/configuration.html)
 
 
+## TODO
+
+* rationalize env vs command line
+* logout -- output shell commands
+* --project-id and --domain-id => project-name --domain to
+  auto lookup values.

@@ -45,7 +45,7 @@ import shlex
 import sys
 
 from requests.auth import AuthBase
-from typing import Optional, Tuple, Any, Union
+from typing import Any
 from urllib.parse import urlparse, quote, urlencode, parse_qsl
 
 try:
@@ -69,8 +69,28 @@ DEFAULT_REGION = 'eu-de'
 
 AUTH_URL = 'https://iam.{region}.otc.t-systems.com'
 
+def resolve_auth_url(region: str | None = None,
+                     auth_url: str | None = None) -> str:
+    '''Resolve the authentication URL from explicit value, environment, or region default.
+
+    Looks up in this order:
+      1. ``auth_url`` parameter (if provided)
+      2. ``OS_AUTH_URL`` environment variable (if set and non-empty)
+      3. Constructed from :data:`AUTH_URL` template using *region* (or :data:`DEFAULT_REGION`)
+
+    :param region:   Region name used to construct the default URL
+    :param auth_url: Explicit auth URL (takes highest priority)
+    :returns: Resolved authentication base URL
+    '''
+    if auth_url is not None:
+        return auth_url
+    env_url = os.environ.get('OS_AUTH_URL')
+    if env_url:
+        return env_url
+    return AUTH_URL.format(region=region if region is not None else DEFAULT_REGION)
+
 class OTCAkSkAuth(AuthBase):
-  """
+  '''
   OTC/Huawei Cloud SDK-HMAC-SHA256 request signer.
 
   Works with both permanent and temporary AK/SK credentials.
@@ -79,21 +99,21 @@ class OTCAkSkAuth(AuthBase):
   :param ak: Access Key for authentication
   :param sk: Secret Key for signing requests
   :param security_token: Optional security token for temporary credentials
-  """
+  '''
 
-  def __init__(self, ak: str, sk: str, security_token: Optional[str] = None) -> None:
-    """Initialize the OTC authentication handler.
+  def __init__(self, ak: str, sk: str, security_token: str|None = None) -> None:
+    '''Initialize the OTC authentication handler.
 
     :param ak: Access Key
     :param sk: Secret Key
     :param security_token: Optional temporary security token
-    """
+    '''
     self.ak = ak
     self.sk = sk
     self.security_token = security_token
 
   def __call__(self, r: requests.PreparedRequest) -> requests.PreparedRequest:
-    """Sign a prepared request with SDK-HMAC-SHA256 signature.
+    '''Sign a prepared request with SDK-HMAC-SHA256 signature.
 
     This method adds the required authentication headers including
     `X-Sdk-Date`, `X-Security-Token` (if applicable), and `Authorization`
@@ -101,7 +121,7 @@ class OTCAkSkAuth(AuthBase):
 
     :param r: The prepared request to sign
     :return: The signed request with authentication headers
-    """
+    '''
     # 1. Timestamp
     dt = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     r.headers['X-Sdk-Date'] = dt
@@ -349,7 +369,7 @@ def parser_factory() -> argparse.ArgumentParser:
   parser = argparse.ArgumentParser(
     prog='tcurl.py',
     description='Call T Cloud Public API',
-    epilog='Should work with Permanent and Temporary AK/SK pairs',
+    epilog='Works with Permanent and Temporary AK/SK pairs as well as bearer tokens',
     fromfile_prefix_chars='@',
     allow_abbrev=True,
   )
@@ -366,12 +386,20 @@ def parser_factory() -> argparse.ArgumentParser:
                         )
   xscope = subp.add_mutually_exclusive_group()
   xscope.add_argument('--project','-p',
-                    default = None,
-                    help = 'Scope the token to the given project')
+                    default = os.getenv('OS_PROJECT_NAME',None),
+                    help = 'Scope the token to the given project (or environment OS_PROJECT_NAME)')
   xscope.add_argument('--region', '-R',
-                    default = None,
-                    help='Scope the token to the given region')
+                    default = os.getenv('OS_TENANT_NAME', os.getenv('OS_REGION', None)),
+                    help='Unscoped token for the given region (or environment OS_TENANT_NAME)')
+  subp.add_argument('--auth-url','-A',
+                  dest = 'auth_url',
+                  default = None,
+                  help = 'Auth URL (or environment OS_AUTH_URL)')
+
   authgrp = subp.add_mutually_exclusive_group(required = True)
+  #
+  # Either do the login by token or by username
+  #
   authgrp.add_argument('--token','-t',
                       dest = 'token',
                       default = None,
@@ -379,8 +407,9 @@ def parser_factory() -> argparse.ArgumentParser:
   authgrp.add_argument('--username','--user','-u',
                       default = None,
                       help = 'Username for password-based authentication')
+
   subp.add_argument('--password', '--passwd', '-P',
-    default=os.getenv('OS_PASSWORD', None),
+    default = os.getenv('OS_PASSWORD',None),
     help='Password for username+password authentication (or environment: OS_PASSWORD)',
   )
   subp.add_argument('--domain', '--user-domain-name', '--domain-name', '-D',
@@ -397,13 +426,17 @@ def parser_factory() -> argparse.ArgumentParser:
                         )
   xauth = subp.add_mutually_exclusive_group()
   xauth.add_argument('--region', '-R',
-                  default = None,
+                  default = os.getenv('OS_TENANT_NAME', os.getenv('OS_REGION', None)),
                   help = 'Region (used to generate auth-url)',
                   )
   xauth.add_argument('--auth-url','-A',
                   dest = 'auth_url',
                   default = None,
                   help = 'Auth URL (or environment OS_AUTH_URL)')
+  subp.add_argument('--shell',
+                  default = False,
+                  action = 'store_true',
+                  help = 'Generate shell commands')
   subp.add_argument('token',
                   help = 'Token to discard')
   #
@@ -413,8 +446,7 @@ def parser_factory() -> argparse.ArgumentParser:
                         help='Retrieve Agency credentials from metadata server',
                         )
   add_format_args(subp)
-  subp.add_argument('url',
-                      nargs='?',
+  subp.add_argument('--url',
                       default = METADATA_URL,
                       help=f'Optional URL to use (defaults to {METADATA_URL})')
   #
@@ -425,7 +457,7 @@ def parser_factory() -> argparse.ArgumentParser:
                         )
   xauth = subp.add_mutually_exclusive_group()
   xauth.add_argument('--region', '-R',
-                  default = None,
+                  default = os.getenv('OS_TENANT_NAME', os.getenv('OS_REGION', None)),
                   help = 'Region (used to generate auth-url)',
                   )
   xauth.add_argument('--auth-url','-A',
@@ -470,15 +502,14 @@ def parser_factory() -> argparse.ArgumentParser:
       metavar = 'METADATA_URL',
       dest = 'metadata',
     )
-    cgrp.add_argument('--ak', '--access-key', '-a',
-      default=os.getenv('OS_ACCESS_KEY', None),
-      help='Access Key for AK/SK authentication (or environment: OS_ACCESS_KEY)',
-    )
     cgrp.add_argument('--token','-t',
       default=os.getenv('OS_AUTH_TOKEN', os.getenv('OS_TOKEN', None)),
       help='Bearer token for token authentication (or environment: OS_AUTH_TOKEN or OS_TOKEN)',
     )
-
+    cgrp.add_argument('--ak', '--access-key', '-a',
+      default=os.getenv('OS_ACCESS_KEY', None),
+      help='Access Key for AK/SK authentication (or environment: OS_ACCESS_KEY)',
+    )
     subp.add_argument('--sk', '--secret-key', '-s',
       default=os.getenv('OS_SECRET_KEY', None),
       help='Secret Key for AK/SK authentication (or environment: OS_SECRET_KEY)',
@@ -487,26 +518,42 @@ def parser_factory() -> argparse.ArgumentParser:
       default=os.getenv('OS_SECURITY_TOKEN', None),
       help='Security token for temporary AK/SK authentication (or environment: OS_SECURITY_TOKEN)',
     )
-    xgid = subp.add_mutually_exclusive_group()
+    subp.add_argument('--header', '-H',
+      default=[],
+      action = 'append',
+      help='Additional header in Key:Value format (can be specified multiple times)')
+
+    aksk_grp = subp.add_argument_group(title='AK/SK options',
+                                        description = 'Options specific to AK/SK credentials')
+    xgid = aksk_grp.add_mutually_exclusive_group()
     xgid.add_argument('--project-id',
         default = None,
         dest = 'project_id',
         help='Scope the AK/SK-signed request to the given project ID')
+    xgid.add_argument('--project-name',
+        default = None,
+        dest = 'project_name',
+        help='Scope the AK/SK-signed request to the given project by name')
+
     xgid.add_argument('--domain-id',
         default = None,
         dest = 'domain_id',
         help='Scope the AK/SK-signed request to the given domain ID')
-    subp.add_argument('--awsv4-region','--s3region',
+    xgid.add_argument('--domain',
+        default = False,
+        action = 'store_true',
+        help='Scope the AK/SK-signed request to the user\'s domain')
+    aksk_grp.add_argument('--awsv4-region','--s3region',
         dest = 'awsv4_region',
         default = None,
         help = 'If specified it will use it as the region for '
                'AWS V4 Signatures for AK/SK authentication.  Otherwise '
                'SDK-HMAC-SHA256 signatures will be used.')
+    aksk_grp.add_argument('--auth-url','-A',
+                  dest = 'auth_url',
+                  default = None,
+                  help = 'Auth URL (or environment OS_AUTH_URL)')
 
-    subp.add_argument('--header', '-H',
-      default=[],
-      action = 'append',
-      help='Additional header in Key:Value format (can be specified multiple times)')
 
     subp.add_argument('url',
                       help = 'URL endpoint to call',
@@ -601,7 +648,8 @@ def login(
         token:str|None = None,
         username:str|None = None,
         password:str|None = None,
-        domain:str|None = None
+        domain:str|None = None,
+        auth_url:str|None = None,
       ) -> tuple[str,dict]:
   '''Issue bearer tokens
   :param project: scope the token to this project (region is derived from the project name)
@@ -676,7 +724,7 @@ def login(
   else:
     raise ValueError('Incomplete credential set provided')
 
-  auth_url = os.getenv('OS_AUTH_URL', AUTH_URL.format(region=region))
+  auth_url = resolve_auth_url(region, auth_url)
   resp = requests.post(f'{auth_url}/v3/auth/tokens',
                         json = ic({
                           'auth': {
@@ -700,11 +748,7 @@ def logout(region:str|None = None,
   :returns: None
   :raises requests.exceptions.HTTPError: if the revocation request fails
   '''
-  if auth_url is None:
-    if 'OS_AUTH_URL' in os.environ:
-      auth_url = os.environ['OS_AUTH_URL']
-    else:
-      auth_url = AUTH_URL.format(region = region if region is not None else DEFAULT_REGION)
+  auth_url = resolve_auth_url(region, auth_url)
   if VERBOSE:
     sys.stderr.write('Discarding token: {}\n'.format(
           (token[0:10] + ' ... ' + token[-10:]) if len(token) > 20 else token
@@ -733,11 +777,7 @@ def temp_aksk(region:str|None = None,
 
   The AK/SK will have the same permissions as the bearer token.
   '''
-  if auth_url is None:
-    if 'OS_AUTH_URL' in os.environ:
-      auth_url = os.environ['OS_AUTH_URL']
-    else:
-      auth_url = AUTH_URL.format(region = region if region is not None else DEFAULT_REGION)
+  auth_url = resolve_auth_url(region, auth_url)
 
   response = requests.post(f'{auth_url}/v3.0/OS-CREDENTIAL/securitytokens',
                           headers = {
@@ -748,9 +788,9 @@ def temp_aksk(region:str|None = None,
                             'auth': {
                                 'identity': {
                                   'methods': [ 'token' ],
+                                  'duration_seconds': max_secs,
                                   'token': {
                                     'id': token,
-                                    'duration_seconds': max_secs,
                                   }
                                 }
                             }
@@ -789,6 +829,170 @@ def fmt_output(mode:str, data:dict[str,Any], raw:list[str], shell:dict[str,str])
   else:
     raise ValueError(f'output_mode: {mode}')
 
+def cli_login(args:argparse.Namespace) -> int:
+  '''CLI login implementation
+  :param args: Command line arguments
+  :returns: Program exit code
+  '''
+  token, details = login(project = args.project, region = args.region,
+                token = args.token,
+                username = args.username,
+                password = args.password,
+                domain = args.domain,
+                auth_url = args.auth_url,
+  )
+  details['token'] = token
+  if 'project' in details:
+    id_path = 'project.id'
+    id_type = 'PROJECT'
+  elif 'domain' in details:
+    id_path = 'domain.id'
+    id_type = 'DOMAIN'
+  else:
+    id_path = 'user.domain.id'
+    id_type = 'USER'
+
+  print(fmt_output(args.output,
+                    details,
+                    [ 'token', 'expires_at', id_path ],
+                    {
+                      'OS_AUTH_TOKEN': 'token',
+                      'OS_AUTH_EXPIRES_AT': 'expires_at',
+                      f'OS_AUTH_{id_type}_ID': id_path,
+                    }))
+  return 0
+
+def cli_logout(args:argparse.Namespace) -> int:
+  '''CLI logout implementation
+  :param args: Command line arguments
+  :returns: Program exit code
+  '''
+  logout(region = args.region,
+          auth_url = args.auth_url,
+          token = args.token)
+  if args.shell:
+    print('unset OS_AUTH_TOKEN')
+    print('unset OS_AUTH_EXPIRES_AT')
+    print('unset OS_AUTH_DOMAIN_ID')
+    print('unset OS_AUTH_PROJECT_ID')
+    print('unset OS_AUTH_USER_ID')
+  return 0
+
+def cli_aksk_output(args:argparse.Namespace, aksk:dict[str,str]) -> int:
+  '''CLI implementation for AKSK items.
+  :param args: Command line arguments
+  :param aksk: credentials to output
+  :returns: Program exit code
+  '''
+  print(fmt_output(args.output,
+                      aksk,
+                      [ 'access', 'secret', 'securitytoken', 'expires_at' ],
+                      {
+                        'OS_ACCESS_KEY': 'access',
+                        'OS_SECRET_KEY': 'secret',
+                        'OS_SECURITY_TOKEN': 'securitytoken',
+                        'OS_AKSK_EXPIRES_AT': 'expires_at',
+                      }))
+  return 0
+
+def cli_verb(args:argparse.Namespace) -> int:
+  '''HTTP verb implementations
+  :param args: Command line arguments
+  :returns: Program exit code
+  '''
+  if args.metadata is not None:
+    if VERBOSE:
+      sys.stderr.write(f'Fetching credentials from {args.metadata}\n')
+    aksk = metadata_config(args.metadata)
+    args.ak = aksk['access']
+    args.sk = aksk['secret']
+    args.securitytoken = aksk['securitytoken']
+
+  xargs = creds(ak = args.ak, sk = args.sk, securitytoken = args.securitytoken,
+                token = args.token,
+                awsv4_region = args.awsv4_region,
+                )
+  add_headers(xargs, args.header)
+  if args.ak is None:
+    opts = list()
+    if args.project_id is not None: opts.append('project-id')
+    if args.project_name is not None: opts.append('project-name')
+    if args.domain_id is not None: opts.append('domain-id')
+    if args.domain: opts.append('domain')
+    if opts: sys.stderr.write(f'Ignoring options: {", ".join(opts)}\n')
+  else:
+    if args.project_id is not None:
+      add_project_id(xargs, args.project_id)
+    elif args.project_name is not None:
+      # Find project ID by name
+      auth_url = resolve_auth_url(DEFAULT_REGION, args.auth_url)
+      resp = requests.get(f'{auth_url}/v3/auth/projects',
+                          **xargs)
+      resp.raise_for_status()
+      jsdat = resp.json()
+      for p in jsdat['projects']:
+        if p['name'] == args.project_name:
+          if VERBOSE: sys.stderr.write(f'Project ID: {p["id"]}\n')
+          add_project_id(xargs, p['id'])
+          break
+      else:
+        raise KeyError(args.project_name)
+    elif args.domain_id is not None:
+      add_domain_id(xargs, args.domain_id)
+    elif args.domain:
+      auth_url = resolve_auth_url(DEFAULT_REGION, args.auth_url)
+      resp = requests.get(f'{auth_url}/v3.0/OS-CREDENTIAL/credentials/{args.ak}',
+                          **xargs)
+      resp.raise_for_status()
+      jsdat = resp.json()
+      user_id = jsdat['credential']['user_id']
+      if VERBOSE: sys.stderr.write(f'User ID: {user_id}\n')
+      resp = requests.get(f'{auth_url}/v3/users/{user_id}',
+                          **xargs)
+      resp.raise_for_status()
+      jsdat = resp.json()
+      domain_id = jsdat['user']['domain_id']
+      if VERBOSE: sys.stderr.write(f'Domain ID: {domain_id}\n')
+      add_domain_id(xargs, domain_id)
+
+
+  if args.verb.upper() == 'GET':
+    resp = requests.get(args.url, **xargs)
+  elif args.verb.upper() == 'DELETE':
+    resp = requests.delete(args.url, **xargs)
+  elif args.verb.upper() == 'HEAD':
+    resp = requests.head(args.url, **xargs)
+  elif args.verb.upper() == 'OPTIONS':
+    resp = requests.options(args.url, **xargs)
+  elif args.verb.upper() == 'POST':
+    add_headers(xargs, ['Content-Type:application/json'])
+    resp = requests.post(
+      args.url,
+      data=args.body,
+      **xargs)
+  elif args.verb.upper() == 'PUT':
+    add_headers(xargs, ['Content-Type:application/json'])
+    resp = requests.put(
+      args.url,
+      data=args.body,
+      **xargs)
+  elif args.verb.upper() == 'PATCH':
+    add_headers(xargs, ['Content-Type:application/json'])
+    resp = requests.patch(
+      args.url,
+      data=args.body,
+      **xargs)
+  else:
+    raise NotImplementedError(args.verb.upper())
+
+  if resp.ok:
+    print(resp.text)
+  else:
+    sys.stderr.write(resp.text+'\n')
+    resp.raise_for_status()
+
+  return 0
+
 if __name__ == '__main__':
   parser = parser_factory()
   args = parser.parse_args()
@@ -798,103 +1002,18 @@ if __name__ == '__main__':
   if args.verb is None:
     parser.print_help()
   elif args.verb == 'login':
-    token, details = login(project = args.project, region = args.region,
-                  token = args.token,
-                  username = args.username,
-                  password = args.password,
-                  domain = args.domain)
-    details['token'] = token
-    if 'project' in details:
-      id_path = 'project.id'
-      id_type = 'PROJECT'
-    elif 'domain' in details:
-      id_path = 'domain.id'
-      id_type = 'DOMAIN'
-    else:
-      id_path = 'user.domain.id'
-      id_type = 'USER'
-
-    print(fmt_output(args.output,
-                      details,
-                      [ 'token', 'expires_at', id_path ],
-                      {
-                        'OS_AUTH_TOKEN': 'token',
-                        'OS_AUTH_EXPIRES_AT': 'expires_at',
-                        f'OS_AUTH_{id_type}_ID': id_path,
-                      }))
+    sys.exit(cli_login(args))
   elif args.verb == 'logout':
-    logout(region = args.region,
+    sys.exit(cli_logout(args))
+  elif args.verb == 'aksk':
+    sys.exit(cli_aksk_output(args, temp_aksk(
+            region = args.region,
             auth_url = args.auth_url,
-            token = args.token)
-  elif args.verb == 'aksk' or args.verb == 'metadata':
-    if args.verb == 'aksk':
-      aksk = temp_aksk(
-        region = args.region,
-        auth_url = args.auth_url,
-        token = args.token,
-        max_secs = args.max_age,
-      )
-    elif args.verb == 'metadata':
-      aksk = metadata_config(args.url)
-    else:
-      raise RuntimeError('UNREACHABLE CODE')
-    print(fmt_output(args.output,
-                      aksk,
-                      [ 'access', 'secret', 'securitytoken', 'expires_at' ],
-                      {
-                        'OS_ACCESS_KEY': 'access',
-                        'OS_SECRET_KEY': 'secret',
-                        'OS_SECURITY_TOKEN': 'securitytoken',
-                        'OS_AKSK_EXPIRES_AT': 'expires_at',
-                      }))
+            token = args.token,
+            max_secs = args.maxage,
+    )))
+  elif args.verb == 'metadata':
+    sys.exit(cli_aksk_output(args, metadata_config(args.url)))
   else:
-    if args.metadata is not None:
-      if VERBOSE:
-        sys.stderr.write(f'Fetching credentials from {args.metadata}\n')
-      aksk = metadata_config(args.metadata)
-      args.ak = aksk['access']
-      args.sk = aksk['secret']
-      args.securitytoken = aksk['securitytoken']
-
-    xargs = creds(ak = args.ak, sk = args.sk, securitytoken = args.securitytoken,
-                  token = args.token,
-                  awsv4_region = args.awsv4_region,
-                  )
-    add_headers(xargs, args.header)
-    if args.project_id is not None:
-      add_project_id(xargs, args.project_id)
-    if args.domain_id is not None:
-      add_domain_id(xargs, args.domain_id)
-
-    if args.verb.upper() == 'GET':
-      resp = requests.get(args.url, **xargs)
-    elif args.verb.upper() == 'DELETE':
-      resp = requests.delete(args.url, **xargs)
-    elif args.verb.upper() == 'HEAD':
-      resp = requests.head(args.url, **xargs)
-    elif args.verb.upper() == 'OPTIONS':
-      resp = requests.options(args.url, **xargs)
-    elif args.verb.upper() == 'POST':
-      add_headers(xargs, ['Content-Type:application/json'])
-      resp = requests.post(
-        args.url,
-        data=args.body,
-        **xargs)
-    elif args.verb.upper() == 'PUT':
-      add_headers(xargs, ['Content-Type:application/json'])
-      resp = requests.put(
-        args.url,
-        data=args.body,
-        **xargs)
-    elif args.verb.upper() == 'PATCH':
-      add_headers(xargs, ['Content-Type:application/json'])
-      resp = requests.patch(
-        args.url,
-        data=args.body,
-        **xargs)
-    else:
-      parser.error(f'{args.verb.upper()}: Unimplemented verb')
-
-    print(resp.text)
-    resp.raise_for_status()
+    sys.exit(cli_verb(args))
 
