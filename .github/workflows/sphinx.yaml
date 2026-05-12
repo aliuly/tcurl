@@ -44,6 +44,7 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Generating sphinx documentation
         run: |
+          git describe --always
           make -C docs html && cp -av docs/_build/html _site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5

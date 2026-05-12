@@ -432,11 +432,19 @@ def parser_factory() -> argparse.ArgumentParser:
                   default = None,
                   help = 'Auth URL (or environment OS_AUTH_URL)')
   subp.add_argument('--shell',
-                  default = False,
-                  action = 'store_true',
+                  default = None,
+                  action = 'store_const',
+                  const = 'shell',
                   help = 'Generate shell commands')
-  subp.add_argument('token',
-                  help = 'Token to discard')
+  subp.add_argument('--format', '-f',
+                    dest = 'shell',
+                    choices = ['shell'],
+                    help = 'Compatibility only')
+
+  subp.add_argument('--token','-t',
+      default=os.getenv('OS_AUTH_TOKEN', os.getenv('OS_TOKEN', None)),
+      help='Token to discard (or environment: OS_AUTH_TOKEN or OS_TOKEN)',
+  )
   #
   # metadata parser
   #
@@ -468,8 +476,10 @@ def parser_factory() -> argparse.ArgumentParser:
                     type = int,
                     default = 900,
                     )
-  subp.add_argument('token',
-                      help='Bearer token (AK/SK will get the same permissions)')
+  subp.add_argument('--token','-t',
+      default=os.getenv('OS_AUTH_TOKEN', os.getenv('OS_TOKEN', None)),
+      help='Bearer token to use (or environment: OS_AUTH_TOKEN or OS_TOKEN)',
+  )
 
   #
   # REST VERB Parsers

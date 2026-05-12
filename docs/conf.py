@@ -28,9 +28,9 @@ try:
       text = True,
       check = True
     )
-  VERSION = result.stdout.strip()
+  VERSION = rc.stdout.strip()
 except Exception as e:
-  sys.stderr.write('Error {e}')
+  sys.stderr.write(f'Error {e}')
   VERSION = 'Development'
 
 # -- Project information -----------------------------------------------------

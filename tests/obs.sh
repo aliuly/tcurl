@@ -19,8 +19,8 @@ $curler GET https://iam.eu-de.otc.t-systems.com/v3/regions \
     | jq '.regions[] | .id '
 
 # Get a temp aksk
-eval $($curler aksk --maxage 60 --format shell $OS_AUTH_TOKEN)
-eval $($curler logout --shell $OS_AUTH_TOKEN)
+eval $($curler aksk --maxage 60 --format shell)
+eval $($curler logout -f shell)
 trap '' EXIT
 
 $curler GET \
