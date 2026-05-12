@@ -36,17 +36,17 @@ jobs:
     runs-on: ubuntu-latest
     name: sphinx docs to gh-pages
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
          fetch-depth: 0
       - name: Setup Pages
         # I am not sure what is this step for... Maybe for the upload-pages to work?
-        uses: actions/configure-pages@v3
+        uses: actions/configure-pages@v5
       - name: Generating sphinx documentation
         run: |
           make -C docs html && cp -av docs/_build/html _site
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
   # Deployment job
   deploy:
     environment:
@@ -57,7 +57,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
 
 

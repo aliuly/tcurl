@@ -30,7 +30,6 @@ Requirements:
 - Optional: `icecream` (for debug logging, falls back gracefully)
 - Optional: `pyyaml` (for YAML output format)
 
-:version: 0.0
 :seealso: T Cloud API documentation at https://docs.otc.t-systems.com/
 '''
 
@@ -59,7 +58,7 @@ try:
 except ImportError:
   HAS_YAML = False
 
-VERSION = 'Development'
+VERSION = '2026.05-DEV'
 '''Module version'''
 METADATA_URL = 'http://169.254.169.254/openstack/latest/securitykey'
 '''T Cloud Public URL for Metadata service'''
