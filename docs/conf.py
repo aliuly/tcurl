@@ -13,14 +13,25 @@ import datetime
 import os
 import sys
 from inspect import getsourcefile
+import subprocess
 
 DOCS_DIR = os.path.dirname(os.path.abspath(getsourcefile(lambda: 0)))
 REPO_DIR = os.path.dirname(DOCS_DIR)
 sys.path.insert(0, REPO_DIR)
 # ~ sys.path.insert(1,os.path.join(REPO_DIR,'scullery'))
 
-from tcurl import VERSION
-
+# -- versioning -----------------------------------------------------
+try:
+  rc = subprocess.run(
+      [ 'git','describe','--always' ],
+      capture_output = True,
+      text = True,
+      check = True
+    )
+  VERSION = result.stdout.strip()
+except Exception as e:
+  sys.stderr.write('Error {e}')
+  VERSION = 'Development'
 
 # -- Project information -----------------------------------------------------
 
@@ -30,7 +41,7 @@ copyright = "{}, {}".format(datetime.datetime.now().year, author)
 # The full version, including alpha/beta/rc tags
 release = VERSION
 # The short X.Y version
-version = ".".join(release.split(".")[0:2])
+version = ".".join(VERSION.split(".")[0]) if '.' in VERSION else VERSION
 
 # -- General configuration ---------------------------------------------------
 
@@ -50,7 +61,7 @@ autodoc2_render_plugin = 'myst'
 # Point to the python source to document.  Can be either a directory
 # or a py file.  It *NEEDS* to be a relative path.
 autodoc2_packages = [ os.path.join('..','tcurl.py') ]
- 
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

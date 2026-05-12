@@ -59,7 +59,8 @@ try:
 except ImportError:
   HAS_YAML = False
 
-VERSION = '0.0.0'
+VERSION = 'Development'
+'''Module version'''
 METADATA_URL = 'http://169.254.169.254/openstack/latest/securitykey'
 '''T Cloud Public URL for Metadata service'''
 VERBOSE = False
@@ -68,6 +69,7 @@ DEFAULT_REGION = 'eu-de'
 '''If no region is specified, use this one'''
 
 AUTH_URL = 'https://iam.{region}.otc.t-systems.com'
+'''Format to generate IAM URL'''
 
 def resolve_auth_url(region: str | None = None,
                      auth_url: str | None = None) -> str:
@@ -199,16 +201,13 @@ class OTCAkSkAuth(AuthBase):
 _SERVICE = 's3'
 _ALGORITHM = 'AWS4-HMAC-SHA256'
 
-
 def _sha256_hex(data: bytes) -> str:
   return hashlib.sha256(data).hexdigest()
-
 
 def _hmac_sha256(key: bytes, msg: bytes | str) -> bytes:
   if isinstance(msg, str):
     msg = msg.encode('utf-8')
   return hmac.new(key, msg, hashlib.sha256).digest()
-
 
 def _signing_key(secret_key: str, date_stamp: str, region: str) -> bytes:
   '''Derive the AWS Signature V4 signing key.'''
@@ -332,20 +331,20 @@ def metadata_config(url: str = METADATA_URL) -> dict[str,str]:
   return data['credential']
 
 def get_nested_value(path_string:str, nested_dict:dict) -> Any:
-    """
-    Retrieve a value from a deeply nested dictionary using a dot-separated path.
+  '''
+  Retrieve a value from a deeply nested dictionary using a dot-separated path.
 
-    :param path_string: A string with dot-separated keys, e.g., 'something.or.other'
-    :param nested_dict: A deeply nested dictionary
-    :returns: The value at the specified path
-    :raises KeyError: If any key in the path doesn't exist
-    :raises TypeError: If a path segment leads to a non-dict value
-    """
-    keys = path_string.split('.')
-    current = nested_dict
-    for key in keys:
-        current = current[key]
-    return current
+  :param path_string: A string with dot-separated keys, e.g., 'something.or.other'
+  :param nested_dict: A deeply nested dictionary
+  :returns: The value at the specified path
+  :raises KeyError: If any key in the path doesn't exist
+  :raises TypeError: If a path segment leads to a non-dict value
+  '''
+  keys = path_string.split('.')
+  current = nested_dict
+  for key in keys:
+    current = current[key]
+  return current
 
 def add_format_args(parser:argparse.ArgumentParser) -> None:
   '''Add the --format option to a parser
