@@ -414,6 +414,8 @@ def parser_factory() -> argparse.ArgumentParser:
     default=os.getenv('OS_USER_DOMAIN_NAME', None),
     help='User Domain name e.g. OTC0000xxxx (or environment: OS_USER_DOMAIN_NAME)',
   )
+  subp.add_argument('--totp',
+                    help = 'Virtual MFA OTP code')
   add_format_args(subp)
 
   #
@@ -658,6 +660,7 @@ def login(
         password:str|None = None,
         domain:str|None = None,
         auth_url:str|None = None,
+        totp:str|None = None
       ) -> tuple[str,dict]:
   '''Issue bearer tokens
   :param project: scope the token to this project (region is derived from the project name)
@@ -733,13 +736,20 @@ def login(
     raise ValueError('Incomplete credential set provided')
 
   auth_url = resolve_auth_url(region, auth_url)
+  if totp is not None:
+    identity['totp'] = {
+      'user': {
+        'name': username,
+        'passcode': totp,
+      }
+    }
   resp = requests.post(f'{auth_url}/v3/auth/tokens',
-                        json = ic({
-                          'auth': {
+                        json = {
+                          'auth':  {
                             'identity': identity,
                             'scope': scope,
                           }
-                        }))
+                        })
   if resp.status_code != 201 or 'X-Subject-Token' not in resp.headers:
     raise PermissionError(resp.text)
   data = resp.json()
@@ -848,6 +858,7 @@ def cli_login(args:argparse.Namespace) -> int:
                 password = args.password,
                 domain = args.domain,
                 auth_url = args.auth_url,
+                totp = args.totp,
   )
   details['token'] = token
   if 'project' in details:
