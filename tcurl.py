@@ -360,6 +360,29 @@ def add_format_args(parser:argparse.ArgumentParser) -> None:
                     choices = formats,
                     help = 'Output format: %(choices)s (default: %(default)s)')
 
+def project_lookup(project_name:str, xargs:dict, auth_url:str|None) -> str:
+  auth_url = resolve_auth_url(DEFAULT_REGION, auth_url)
+  resp = requests.get(f'{auth_url}/v3/auth/projects',
+                          **xargs)
+  resp.raise_for_status()
+  jsdat = resp.json()
+  for p in jsdat['projects']:
+    if p['name'] == project_name: return p['id']
+  return None
+
+def ak_domain_lookup(ak:str, xargs:dict, auth_url:str|None) -> [str,str]:
+  auth_url = resolve_auth_url(DEFAULT_REGION, auth_url)
+  resp = requests.get(f'{auth_url}/v3.0/OS-CREDENTIAL/credentials/{ak}',
+                          **xargs)
+  resp.raise_for_status()
+  jsdat = resp.json()
+  user_id = jsdat['credential']['user_id']
+  resp = requests.get(f'{auth_url}/v3/users/{user_id}', **xargs)
+  resp.raise_for_status()
+  jsdat = resp.json()
+  domain_id = jsdat['user']['domain_id']
+  return domain_id, user_id
+
 def err_input(prompt:str = '') -> str:
   '''Like `input()` but prompt shows on stderr
   :param prompt: query prompt
@@ -981,36 +1004,19 @@ def cli_verb(args:argparse.Namespace) -> int:
       add_project_id(xargs, args.project_id)
     elif args.project_name is not None:
       # Find project ID by name
-      auth_url = resolve_auth_url(DEFAULT_REGION, args.auth_url)
-      resp = requests.get(f'{auth_url}/v3/auth/projects',
-                          **xargs)
-      resp.raise_for_status()
-      jsdat = resp.json()
-      for p in jsdat['projects']:
-        if p['name'] == args.project_name:
-          if VERBOSE: sys.stderr.write(f'Project ID: {p["id"]}\n')
-          add_project_id(xargs, p['id'])
-          break
-      else:
-        raise KeyError(args.project_name)
+      project_id = project_lookup(args.project_name, xargs, args.auth_url)
+      if project_id is None: raise KeyError(args.project_name)
+      if VERBOSE: sys.stderr.write(f'Project ID: {p["id"]}\n')
+      add_project_id(xargs, project_id)
+
     elif args.domain_id is not None:
       add_domain_id(xargs, args.domain_id)
     elif args.domain:
-      auth_url = resolve_auth_url(DEFAULT_REGION, args.auth_url)
-      resp = requests.get(f'{auth_url}/v3.0/OS-CREDENTIAL/credentials/{args.ak}',
-                          **xargs)
-      resp.raise_for_status()
-      jsdat = resp.json()
-      user_id = jsdat['credential']['user_id']
-      if VERBOSE: sys.stderr.write(f'User ID: {user_id}\n')
-      resp = requests.get(f'{auth_url}/v3/users/{user_id}',
-                          **xargs)
-      resp.raise_for_status()
-      jsdat = resp.json()
-      domain_id = jsdat['user']['domain_id']
-      if VERBOSE: sys.stderr.write(f'Domain ID: {domain_id}\n')
+      domain_id, user_id = ak_domain_lookup(args.ak, xargs, args.auth_url)
+      if VERBOSE:
+        sys.stderr.write(f'User ID: {user_id}\n')
+        sys.stderr.write(f'Domain ID: {domain_id}\n')
       add_domain_id(xargs, domain_id)
-
 
   if args.verb.upper() == 'GET':
     resp = requests.get(args.url, **xargs)
