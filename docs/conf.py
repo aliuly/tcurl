@@ -41,7 +41,9 @@ copyright = "{}, {}".format(datetime.datetime.now().year, author)
 # The full version, including alpha/beta/rc tags
 release = VERSION
 # The short X.Y version
-version = ".".join(VERSION.split(".")[0]) if '.' in VERSION else VERSION
+# Extract from git describe output: "v2026.05-3-gabc1234" -> "2026.05"
+parts = VERSION.split("-")[0].split(".")
+version = ".".join(parts[:2]).lstrip("v") if len(parts) >= 2 else VERSION
 
 # -- General configuration ---------------------------------------------------
 
@@ -57,10 +59,14 @@ myst_enable_extensions = [
   'tasklist',
   'fieldlist',
 ]
+
 autodoc2_render_plugin = 'myst'
 # Point to the python source to document.  Can be either a directory
 # or a py file.  It *NEEDS* to be a relative path.
-autodoc2_packages = [ os.path.join('..','tcurl.py') ]
+autodoc2_packages = [
+  os.path.join('..','tcurl.py'),
+  os.path.join('..','tcurl_login.py'),
+]
 
 
 # Add any paths that contain templates here, relative to this directory.

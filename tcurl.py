@@ -35,6 +35,7 @@ Requirements:
 
 import argparse
 import datetime
+import getpass
 import hashlib
 import hmac
 import json
@@ -359,17 +360,35 @@ def add_format_args(parser:argparse.ArgumentParser) -> None:
                     choices = formats,
                     help = 'Output format: %(choices)s (default: %(default)s)')
 
-def parser_factory() -> argparse.ArgumentParser:
+def err_input(prompt:str = '') -> str:
+  '''Like `input()` but prompt shows on stderr
+  :param prompt: query prompt
+  :returns: input string
+  '''
+  if prompt:
+    sys.stderr.write(prompt)
+    sys.stderr.flush()
+  return input()
+
+
+def parser_factory(color:bool = False) -> argparse.ArgumentParser:
   '''Create and configure the command-line argument parser.
 
+  :param color: enable/disable colorized output.
   :return: Configured argument parser for the T Cloud Public API call tool
   '''
+  if sys.version_info >= (3,14):
+    color = { 'color': color }
+  else:
+    color = dict()
+
   parser = argparse.ArgumentParser(
     prog='tcurl.py',
     description='Call T Cloud Public API',
     epilog='Works with Permanent and Temporary AK/SK pairs as well as bearer tokens',
     fromfile_prefix_chars='@',
     allow_abbrev=True,
+    **color,
   )
   parser.add_argument('--verbose', '-v', action='store_true', default=False)
   parser.add_argument('--version', '-V', action='version', version=VERSION)
@@ -405,6 +424,10 @@ def parser_factory() -> argparse.ArgumentParser:
   authgrp.add_argument('--username','--user','-u',
                       default = None,
                       help = 'Username for password-based authentication')
+  authgrp.add_argument('--interactive','-i',
+                      action = 'store_true',
+                      default = False,
+                      help = 'Input login credentials interactively')
 
   subp.add_argument('--password', '--passwd', '-P',
     default = os.getenv('OS_PASSWORD',None),
@@ -852,6 +875,20 @@ def cli_login(args:argparse.Namespace) -> int:
   :param args: Command line arguments
   :returns: Program exit code
   '''
+  if args.interactive:
+    tty = sys.stdin.isatty()
+    args.username = err_input('username: ' if tty else '')
+    args.password = getpass.getpass('password: ') if tty else input()
+    os_domain = os.getenv('OS_USER_DOMAIN_NAME',None)
+    args.domain = err_input(f'domain ({"OTC0000xxxxx" if os_domain is None else os_domain}): ' if tty else '')
+    if not args.domain:
+      if os_domain is None:
+        sys.stderr.write('No domain specified\n')
+        exit(88)
+      args.domain = os_domain
+      sys.stderr.write(f'Will use: {args.domain}\n')
+    args.totp = err_input('Optional One Time Passcode: (Enter to skip) ' if tty else '')
+
   token, details = login(project = args.project, region = args.region,
                 token = args.token,
                 username = args.username,
@@ -1012,8 +1049,8 @@ def cli_verb(args:argparse.Namespace) -> int:
 
   return 0
 
-if __name__ == '__main__':
-  parser = parser_factory()
+def main():
+  parser = parser_factory(color=True)
   args = parser.parse_args()
   ic(args)
   VERBOSE = args.verbose
@@ -1036,3 +1073,5 @@ if __name__ == '__main__':
   else:
     sys.exit(cli_verb(args))
 
+if __name__ == '__main__':
+  main()

@@ -29,11 +29,12 @@ setup(
     url='https://github.com/aliuly/tcurl',
     license='MIT',
     license_files=['LICENSE'],
-    py_modules=['tcurl'],
+    py_modules=['tcurl', 'tcurl_login'],
     python_requires='>=3.10',
     install_requires=[
         'requests',
         'pyyaml',
+        'urwid',
     ],
     extras_require={
         'debug': ['icecream'],
@@ -58,6 +59,7 @@ setup(
     entry_points={
         'console_scripts': [
             'tcurl = tcurl:main',
+            'tcurl-login = tcurl_login:main',
         ],
     },
     project_urls={

@@ -24,7 +24,6 @@ Environment variables:
   * OS_PROJECT_NAME (eu-de_PROJECT_NAME)
   * OS_TENANT_NAME (eu-de)
 
-
 Source preferences
 
 1. command line
@@ -32,10 +31,11 @@ Source preferences
 
 * [OTC extenstions configuration](https://python-otcextensions.readthedocs.io/en/latest/install/configuration.html)
 
-
 ## TODO
 
-* rationalize env vs command line
-* logout -- output shell commands
-* --project-id and --domain-id => project-name --domain to
+* [x] rationalize env vs command line
+* [x] logout -- output shell commands
+* [x] --project-id and --domain-id => project-name --domain to
   auto lookup values.
+* [x] Interactive login
+
