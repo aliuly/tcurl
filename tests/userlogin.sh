@@ -16,7 +16,7 @@ eval $($curler login \
 	--domain "$OS_USER_DOMAIN_NAME" \
 	-f shell
 	)
-trap '$curler logout $OS_AUTH_TOKEN' EXIT
+trap '$curler logout --token $OS_AUTH_TOKEN' EXIT
 
 projects=$($curler GET https://iam.eu-de.otc.t-systems.com/v3/auth/projects \
 	    | jq .projects)
@@ -40,7 +40,7 @@ eval $(
 	--token "$OS_AUTH_TOKEN" \
 	--project "$project_name" \
 	--f shell
-  $curler logout "$OS_AUTH_TOKEN"
+  $curler logout --token "$OS_AUTH_TOKEN"
 )
 $curler GET \
     https://ecs.$project_region.otc.t-systems.com/v2/$project_id/servers \

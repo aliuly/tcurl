@@ -519,7 +519,7 @@ def parser_factory(color:bool = False) -> argparse.ArgumentParser:
                   default = None,
                   help = 'Auth URL (or environment OS_AUTH_URL)')
   add_format_args(subp)
-  subp.add_argument('--maxage', '--limit','--duration','-M',
+  subp.add_argument('--ttl', '--maxage', '--limit','--duration','-M',
                     help = 'Max age for AK/SK in seconds (default: %(default)s)',
                     type = int,
                     default = 900,
@@ -1072,7 +1072,7 @@ def main():
             region = args.region,
             auth_url = args.auth_url,
             token = args.token,
-            max_secs = args.maxage,
+            max_secs = args.ttl,
     )))
   elif args.verb == 'metadata':
     sys.exit(cli_aksk_output(args, metadata_config(args.url)))
