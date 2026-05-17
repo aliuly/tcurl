@@ -23,7 +23,7 @@ $curler GET \
     https://ecs.$project_region.otc.t-systems.com/v2/$project_id/servers \
     | jq .
 
-$curler GET https://iam.eu-de.otc.t-systems.com/v3/auth/projects \
+$curler GET --domain  https://iam.eu-de.otc.t-systems.com/v3/auth/projects \
     | jq '.projects[] | {id: .id, name: .name, description: .description }'
 
 

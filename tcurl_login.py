@@ -68,17 +68,33 @@ PALETTE = [
 class CredentialForm:
   '''Urwid form for collecting credentials with masking'''
 
-  def __init__(self):
+  def __init__(self, defaults:dict[str,str]|None = None):
     self.result = None
+    if defaults is None: defaults = dict()
 
     # Raw Edit widgets (unwrapped) for value access
     self.username_input = urwid.Edit(
-      edit_text=os.environ.get('OS_USERNAME') or os.environ.get('USER') or os.environ.get('LOGNAME', ''),
+      edit_text=  (defaults.get('username')
+                    or os.environ.get('OS_USERNAME')
+                    or os.environ.get('USER')
+                    or os.environ.get('LOGNAME', '')
+                    or ''
+                ),
       allow_tab=False,
     )
-    self.password_input = urwid.Edit(mask='*', allow_tab=False)
+    self.password_input = urwid.Edit(mask='*',
+      allow_tab=False,
+      edit_text = (defaults.get('password')
+                    or os.environ.get('OS_PASSWORD')
+                    or ''
+                ),
+    )
     self.domain_input = urwid.Edit(
-      edit_text=os.environ.get('OS_USER_DOMAIN_NAME', ''),
+      edit_text = (
+          defaults.get('user_domain_name')
+          or os.environ.get('OS_USER_DOMAIN_NAME', '')
+          or ''
+      ),
       allow_tab=False,
     )
     self.otp_input = urwid.Edit(allow_tab=False)
@@ -266,7 +282,7 @@ class CredentialForm:
     return True
 
 
-def get_credentials() -> dict[str,str]|None:
+def get_credentials(defaults:dict[str,str]|None = None) -> dict[str,str]|None:
   '''
   Show credential form and return results
 
@@ -274,7 +290,7 @@ def get_credentials() -> dict[str,str]|None:
     Dictionary with 'username', 'password', 'domain', 'otp' keys,
     or None if cancelled
   '''
-  form = CredentialForm()
+  form = CredentialForm(defaults)
   return form.run()
 
 def parser_factory(color:bool = False) -> argparse.ArgumentParser:
