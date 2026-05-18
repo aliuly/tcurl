@@ -235,7 +235,7 @@ class CredentialForm:
     self.result = None
     raise urwid.ExitMainLoop()
 
-  def run(self) -> Optional[Dict]:
+  def run(self) -> dict|None:
     '''Run the form and return credentials'''
 
     def unhandled(key: str) -> bool:
